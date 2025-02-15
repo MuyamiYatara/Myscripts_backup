@@ -32,7 +32,7 @@ echo ”A total of $SLURM_NTASKS tasks is used”
 #export LD_LIBRARY_PATH=/usr/local/lib64:$LD_LIBRARY_PATH
 
 #mpirun -np 1 wannier90.x ./wannier90
- mpirun /home/apps/wannier90-1.2/wannier90.x ./wannier90
+mpirun /data/home/apps/wannier90-1.2/wannier90.x ./wannier90
 
 
   

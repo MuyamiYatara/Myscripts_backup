@@ -32,7 +32,7 @@ echo ”A total of $SLURM_NTASKS tasks is used”
 ### 加载任务所需要的库  /home/ycshen/wannier_tools_test/bin/wt.x 
 #export LD_LIBRARY_PATH=/usr/local/lib64:$LD_LIBRARY_PATH
 #
-mpirun /home/apps/vasp5.4.4/vasp5.4.4_wannier90-1.2/bin/vasp_ncl
+mpirun /data/home/apps/vasp5.4.4/vasp5.4.4_wannier90-1.2/bin/vasp_ncl
 
 
 

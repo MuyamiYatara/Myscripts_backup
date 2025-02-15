@@ -331,7 +331,7 @@ sbatch_script_name = 'NANO.sh'
 
 
 # input commands
-nano = sp.Popen(["cp", f"/home/ycshen/Myscripts/{sbatch_script_name}", "./"])
+nano = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/{sbatch_script_name}", "./"])
 vaspkit = sp.Popen(["vaspkit"], stdin=sp.PIPE)
 
 # vaspkit task 102, Monkhorst-Pack Scheme
@@ -344,9 +344,9 @@ vaspkit.communicate(input=command_sc_inputs)
 ##### edit the sbatch script #####
 sbatch_para = {
     '#SBATCH -N': 2,
-    '#SBATCH -n': 128,
+    '#SBATCH -n': 112,
     '#SBATCH -A': 'hmt03',  
-    '#SBATCH -p': 'regular6430',
+    '#SBATCH -p': 'regular',
 }
 edit_sbatch_script(sbatch_para)
 
@@ -364,11 +364,11 @@ SCF_para = {
     'ENCUT': encut,
     "LORBMOM": ".TRUE.",
     "LWAVE":".FALSE.",
-    'ISPIN': '2',
+    'ISPIN': '1',
     'LSORBIT': '.TRUE.',
-    'MAGMOM': '0 0 0 0 0 0  0 0 0 0 0 0 0 0 0 0 0 0',
-    "NPAR":"32",
-    'NBANDS':'256'
+    'MAGMOM': '0 0 0 0 0 0  2 2 2 2 2 2  0'
+    # "NPAR":"32",
+    # 'NBANDS':'256'
 
 }
 edit_INCAR(SCF_para)
@@ -385,7 +385,7 @@ cp_poscar = sp.Popen(["cp", f"../POSCAR", "./"])
 cp_incar = sp.Popen(["cp", f"../INCAR", "./"])
 cp_potcar = sp.Popen(["cp", f"../POTCAR", "./"])
 cp_nano = sp.Popen(["cp", f"../{sbatch_script_name}", "./"])
-fatband = sp.Popen(["cp", f"/home/ycshen/Myscripts/fatband_generate.py", "./"])
+fatband = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/fatband_generate.py", "./"])
 
 vaspkit = sp.Popen(["vaspkit"], stdin=sp.PIPE)
 
@@ -477,9 +477,9 @@ cp_incar = sp.Popen(["cp", f"../INCAR", "./"])
 cp_potcar = sp.Popen(["cp", f"../POTCAR", "./"])
 cp_kpoints = sp.Popen(["cp", f"../KPOINTS", "./"])
 cp_nano = sp.Popen(["cp", f"../{sbatch_script_name}", "./"])
-win = sp.Popen(["cp", f"/home/ycshen/Myscripts/wannier90.win_backup", "./"])
-w90 = sp.Popen(["cp", f"/home/ycshen/Myscripts/W90.sh", "./"])
-w9gnu = sp.Popen(["cp", f"/home/ycshen/Myscripts/w9.gnu", "./"])
+win = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/wannier90.win_backup", "./"])
+w90 = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/W90.sh", "./"])
+w9gnu = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/w9.gnu", "./"])
 
 win.communicate()
 w90.communicate()

@@ -1,14 +1,14 @@
 # for generating fatband plot py file
 
 #####################  Custom Variables  #######################
-modeofplot = "s" # plot mode, band structure with spin density is "s", with atom and orbital projections is "o"
+modeofplot = 'o'
 spins_mode = "[0,1]" # spin plot mode, "[0,1]" for spin considered DFT, band spin polarization can be showed 
-Emin = '-5' # energy range(ev)
-Emax = '9' 
+Emin = '-15'
+Emax = '30'
 cmap = "\'hot_r\'" # the pattern of color map, see more in "https://zhuanlan.zhihu.com/p/114420786",spins can use seismic, orbitals can use hot_r
-targetelements = ['Fe','Ga'] # the atoms you want to see, note that you must match the lenth of this list with orbitals  
-targetorbitals = ['d','p'] # the orbitals you want to see
-fermienergy ='6.44'
+targetelements = ['Fe', 'Fe', 'Fe', 'Pt', 'Pt', 'Pt']
+targetorbitals = ['s', 'p', 'd', 's', 'p', 'd']
+fermienergy = '7.1567'
 
 #####################  Custom Variables  #######################
 
@@ -64,14 +64,28 @@ with open('KPOINTS', mode='r') as kpoints :
     while True :
         tmp_k = kpoints.readline()
         if not tmp_k :
+            knames.append(end_tmp_k[len(end_tmp_k)-1])
+            kticks.append(i)
             break
         tmp_k = tmp_k.rstrip('\n')
         tmp_k = tmp_k.rstrip()
         tmp_k = tmp_k.split(' ')
-        knames.append(tmp_k[len(tmp_k)-1])
+        if i == 0 :
+            knames.append(tmp_k[len(tmp_k)-1])
+        else :    
+            if (tmp_k[len(tmp_k)-1] ==  end_tmp_k[len(end_tmp_k)-1]) :
+                knames.append(tmp_k[len(tmp_k)-1])
+            else :
+                knames.append( end_tmp_k[len(end_tmp_k)-1]+ "|" + tmp_k[len(tmp_k)-1] )
+            
         kticks.append(i)
         i = i + k_interval
-        kpoints.readline()
+
+        end_tmp_k = kpoints.readline()
+        end_tmp_k = end_tmp_k.rstrip('\n')
+        end_tmp_k = end_tmp_k.rstrip()
+        end_tmp_k = end_tmp_k.split(' ')
+        
         kpoints.readline()
 
 knames = str(knames)
