@@ -65,7 +65,7 @@ with open('KPOINTS', mode='r') as kpoints :
         tmp_k = kpoints.readline()
         if not tmp_k :
             knames.append(end_tmp_k[len(end_tmp_k)-1])
-            kticks.append(i)
+            kticks.append(i-1)
             break
         tmp_k = tmp_k.rstrip('\n')
         tmp_k = tmp_k.rstrip()
