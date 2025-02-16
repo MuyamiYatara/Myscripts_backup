@@ -16,6 +16,6 @@ discontinuities=[]
 pyprocar.repair('PROCAR','PROCAR-band')
 #-------------------------------------#
 title='D03_bandstructure'
-pic = pyprocar.bandsplot(dirname='../SOC',code='vasp',title=title,fermi=6.44,elimit=[Emin,Emax],mode='plain',spins=[0],knames=knames,kticks=kticks,opacity=[1.0],linestyle=['dashed'],color='gray',fermi_linestyle='solid',fermi_color='green',fermi_linewidth=1,print_plot_opts=True,dpi=100,show=False)
-pyprocar.bandsplot(dirname='.',code='vasp',title=title,fermi=6.44,elimit=[Emin,Emax],mode='plain',spins=[0,1],spin_colors=['blue','red'],knames=knames,kticks=kticks,linestyle=['solid','solid'],opacity=[1.0,1.0],linewidth=[1,1],fermi_linestyle='solid',fermi_color='green',fermi_linewidth=1,ax=pic[1],dpi=300,savefig="bandspin.png")
+pic = pyprocar.bandsplot(dirname='../SOC',code='vasp',title=title,fermi=6.44,elimit=[Emin,Emax],mode='plain',spins=[0],knames=knames,kticks=kticks,opacity=[1.0],linestyle=['dashed'],color='gray',fermi_linestyle='solid',fermi_color='green',fermi_linewidth=1,print_plot_opts=True,dpi=100,show=False,figure_size=[15,6],linewidth=[2])
+pyprocar.bandsplot(dirname='.',code='vasp',title=title,fermi=6.44,elimit=[Emin,Emax],mode='plain',spins=[0,1],spin_colors=['blue','red'],knames=knames,kticks=kticks,linestyle=['solid','solid'],opacity=[1.0,1.0],linewidth=[2,2],fermi_linestyle='solid',fermi_color='green',fermi_linewidth=1,ax=pic[1],dpi=300,savefig="bandspin.png")
 
