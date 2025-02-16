@@ -6,7 +6,7 @@ dis_win_max   = 6.7d0
 dis_froz_min  =  -5d0      # energy window
 dis_froz_max  =  5.7d0
 dis_num_iter  =  100
-num_iter      =  10
+num_iter      =  0
 num_print_cycles = 20
 spinors = .true.
 
