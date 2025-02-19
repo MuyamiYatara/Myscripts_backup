@@ -4,7 +4,7 @@
 #SBATCH -n 112
 #SBATCH -A hmt03  
 #SBATCH -p regular
-#SBATCH --job-name=Fe3GaD03
+#SBATCH --job-name=NaN
 #SBATCH --output=./log 
 #SBATCH --error=./err
 #
