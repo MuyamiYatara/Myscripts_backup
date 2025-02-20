@@ -12,13 +12,13 @@ lower_bound = -2
 
 set yrange [lower_bound : upper_bound]
 ### arrows and xsticks copied from wannier90_band.gnu file ###
-set arrow from  0.76509,  lower_bound to  0.76509,  upper_bound nohead
-set arrow from  1.53018,  lower_bound to  1.53018,  upper_bound nohead
-set arrow from  2.61218,  lower_bound to  2.61218,  upper_bound nohead
-set arrow from  3.69419,  lower_bound to  3.69419,  upper_bound nohead
-set arrow from  4.45928,  lower_bound to  4.45928,  upper_bound nohead
-set arrow from  5.22437,  lower_bound to  5.22437,  upper_bound nohead
-set xtics (" � "  0.00000," X "  0.76509," M "  1.53018," � "  2.61218," Z "  3.69419," R "  4.45928," A "  5.22437," Z "  6.30637)
+#set arrow from  0.76509,  lower_bound to  0.76509,  upper_bound nohead
+#set arrow from  1.53018,  lower_bound to  1.53018,  upper_bound nohead
+#set arrow from  2.61218,  lower_bound to  2.61218,  upper_bound nohead
+#set arrow from  3.69419,  lower_bound to  3.69419,  upper_bound nohead
+#set arrow from  4.45928,  lower_bound to  4.45928,  upper_bound nohead
+#set arrow from  5.22437,  lower_bound to  5.22437,  upper_bound nohead
+#set xtics (" � "  0.00000," X "  0.76509," M "  1.53018," � "  2.61218," Z "  3.69419," R "  4.45928," A "  5.22437," Z "  6.30637)
 
 set arrow from graph 0, first 0 to graph 1, first 0 nohead lw 4 lc rgb "green" lt 1 
 set key outside spacing 1 font ",25" sample 3

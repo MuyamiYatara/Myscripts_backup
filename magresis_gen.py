@@ -1,6 +1,7 @@
 from sklearn.metrics import silhouette_score, adjusted_rand_score, normalized_mutual_info_score
 from sklearn.cluster import KMeans
 from sklearn.datasets import make_blobs
+from sklearn.manifold import TSNE
 import numpy as np
 import itertools
 from joblib import Parallel, delayed
@@ -8,7 +9,14 @@ from tqdm import tqdm
 import random
 import matplotlib.pyplot as plt
 import time
+import sys
 from scipy.optimize import fsolve
+
+kb = 1.380649*10**-23 #单位：J/K
+hbar = 1.0545718*10**-34 #单位：J*s
+temperature = 100.0  #单位：K
+electron = 1.6*10**-19 #单位：C
+
 
 
 ###------------------- 曲线生成与参数化 -------------------###
@@ -46,21 +54,28 @@ def M_BT_curve(B_array, T, alpha, l) :
     return MBT_loop
 
 
-    
-
-
 # 曲线定义
-def mag_formula_two_band(sigma1, mu1, sigma2, mu2, sigmaA, B):
 
+def mag_formula_two_band(n1, mu1, n2, mu2, sigmaA, B):
 
-    #sigmaA_B = sigmaA*np.tanh(500*B)
+    sigma1 = electron*n1*np.abs(mu1)
+    sigma2 = electron*n2*np.abs(mu2)
 
-    numerator = sigma1 + B**2*mu2**2*sigma1 + sigma2 + B**2*mu1**2*sigma2
-    denominator = (1.0+B**2*mu2**2)*sigma1**2+ \
-    2*sigma1*(sigma2 + B**2*mu1*mu2*sigma2 + B*mu1*(1.0+B**2*mu2**2)*sigmaA)+ \
-    (1.0+B**2*mu1**2)*(sigma2**2 + 2*B*mu2*sigma2*sigmaA + (1.0+B**2*mu2**2)*sigmaA**2)
+    sigma_matrix_1 = np.array([[sigma1/(1+mu1**2*B**2), sigma1*mu1*B/(1+mu1**2*B**2)],\
+                              [-sigma1*mu1*B/(1+mu1**2*B**2), sigma1/(1+mu1**2*B**2)]])
+    
+    sigma_matrix_2 = np.array([[sigma2/(1+mu2**2*B**2), sigma2*mu2*B/(1+mu2**2*B**2)],\
+                              [-sigma2*mu2*B/(1+mu2**2*B**2), sigma2/(1+mu2**2*B**2)]])
+    
+    sigma_matrix_A = np.array([[0.0, sigmaA],\
+                              [-sigmaA, 0.0]])
 
-    return numerator/denominator
+    sigma_matrix_total= sigma_matrix_1 + sigma_matrix_2 + sigma_matrix_A
+
+    #sigma_inv = (1.0/np.linalg.det(sigma_matrix_total))*np.transpose( sigma_matrix_total)#
+    sigma_inv = np.linalg.inv(sigma_matrix_total)
+    return sigma_inv[0,0]
+
 
 def mag_formula_three_band(sigma1, mu1, sigma2, mu2, sigma3, mu3, sigmaA, B):
     sigma_matrix_1 = np.array([[sigma1/(1+mu1**2*B**2), sigma1*mu1*B/(1+mu1**2*B**2)],\
@@ -79,16 +94,27 @@ def mag_formula_three_band(sigma1, mu1, sigma2, mu2, sigma3, mu3, sigmaA, B):
     return sigma_inv[0,0]
 
 
+# def magthermo_formula_two_band(sigma1, mu1, sigma2, mu2, sigmaA, B) :
+#     sigma_matrix_1 = np.array([[sigma1/(1+mu1**2*B**2), sigma1*mu1*B/(1+mu1**2*B**2)],\
+#                               [-sigma1*mu1*B/(1+mu1**2*B**2), sigma1/(1+mu1**2*B**2)]])
+    
+#     sigma_matrix_2 = np.array([[sigma2/(1+mu2**2*B**2), sigma2*mu2*B/(1+mu2**2*B**2)],\
+#                               [-sigma2*mu2*B/(1+mu2**2*B**2), sigma2/(1+mu2**2*B**2)]])
+
+                        
+
 # 采样曲线的参数范围
 curve_param_dictionary = { #每个参数都以 [最小值， 最大值， 个数] 的方式给定
-    "B" : [-0.5, 0.5, 200], #单位：T
-    "sigma1" : [1.0*10**4, 1.0*10**5, 2], #单位：S/cm 
-    "mu1" : [-300.0, 300.0, 50], #单位：(C*s)/kg, 为电子则mu为负值，为空穴则mu为正值
-    "sigma2" : [1.0*10**4, 1.0*10**5, 2], #单位：S/cm
-    "mu2" : [-300.0, 300.0, 50], #单位：(C*s)/kg, 为电子则mu为负值，为空穴则mu为正值
-    "sigma3" : [1.0*10**4, 1.0*10**5, 2], #单位：S/cm
-    "mu3" : [-300.0, 300.0, 50], #单位：(C*s)/kg, 为电子则mu为负值，为空穴则mu为正值
-    "sigmaA" : [1000, 2000, 2], #单位：S/cm
+    "B" : [-15, 15, 200], #单位：T
+    "n1" : [1.0*10**22, 5.0*10**23, 1], #单位：m^-3 
+    "mu1" : [-30, -31.0, 1], #单位：(C*s)/kg, 为电子则mu为负值，为空穴则mu为正值
+    "n2" : [2.0*10**22, 5.0*10**23, 1], #单位：m^-3
+    "mu2" : [-30, -31.0, 1], #单位：(C*s)/kg, 为电子则mu为负值，为空穴则mu为正值
+    #"sigma3" : [1.0*10**5, 5.0*10**5, 2], #单位：S/cm
+    #"mu3" : [-300.0, 300.0, 30], #单位：(C*s)/kg, 为电子则mu为负值，为空穴则mu为正值
+    "sigmaA" : [0.0, 2000, 1], #单位：S/cm
+    #"tau": [1.0*10**-13, 10.0*10**-13, 2],
+    #"seebeckA" :[1.0, 3.0, 2]
 }
 paranamelist = list(curve_param_dictionary.keys())
 # 定义每个参数对应的array
@@ -97,11 +123,11 @@ for pname, i in curve_param_dictionary.items() :
 
 # 生成总的参数空间
 
-#curve_param_array = np.array(list(itertools.product(sigma1_array, mu1_array, \
-#                                                    sigma2_array, mu2_array, sigmaA_array ))) #@@@ two bands
+curve_param_array = np.array(list(itertools.product(n1_array, mu1_array, \
+                                                    n2_array, mu2_array, sigmaA_array ))) #@@@ two bands
 
-curve_param_array = np.array(list(itertools.product(sigma1_array, mu1_array, sigma2_array, \
-                                                    mu2_array, sigma3_array, mu3_array,sigmaA_array ))) #@@@ three bands
+#curve_param_array = np.array(list(itertools.product(sigma1_array, mu1_array, sigma2_array, \
+#                                                    mu2_array, sigma3_array, mu3_array,sigmaA_array ))) #@@@ three bands
 
 total_curve_num = np.shape(curve_param_array)[0]
 
@@ -113,26 +139,34 @@ def generate_curve(start_idx, end_idx):
     rhocurve_values = []
     for i in range(start_idx, end_idx):
         lthB = len(B_array)
-        # y_1 = [mag_formula_two_band(curve_param_array[i, 0], curve_param_array[i, 1],\
-        #                            curve_param_array[i, 2], curve_param_array[i, 3], \
-        #                             curve_param_array[i, 4]*M_loop[index], j ) for index, j in enumerate(B_array)] #@@@ two bands
+        y_1 = [mag_formula_two_band(curve_param_array[i, 0], curve_param_array[i, 1],\
+                                    curve_param_array[i, 2], curve_param_array[i, 3], \
+                                     curve_param_array[i, 4]*M_loop[index], j ) for index, j in enumerate(B_array)] #@@@ two bands
         
-        # y_2 = [mag_formula_two_band(curve_param_array[i, 0], curve_param_array[i, 1],\
-        #                            curve_param_array[i, 2], curve_param_array[i, 3], \
-        #                             curve_param_array[i, 4]*M_loop[index+lthB], j ) for index, j in enumerate(B_array)] #@@@ two bands
+        y_2 = [mag_formula_two_band(curve_param_array[i, 0], curve_param_array[i, 1],\
+                                    curve_param_array[i, 2], curve_param_array[i, 3], \
+                                     curve_param_array[i, 4]*M_loop[index+lthB], j ) for index, j in enumerate(B_array)] #@@@ two bands
         
-        y_1 = [mag_formula_three_band(curve_param_array[i, 0], curve_param_array[i, 1],\
-                                   curve_param_array[i, 2], curve_param_array[i, 3], \
-                                   curve_param_array[i, 4], curve_param_array[i, 5], \
-                                    curve_param_array[i, 6]*M_loop[index], j ) for index, j in enumerate(B_array)] #@@@ three bands
+        #y_1 = [mag_formula_three_band(curve_param_array[i, 0], curve_param_array[i, 1],\
+        #                           curve_param_array[i, 2], curve_param_array[i, 3], \
+        #                           curve_param_array[i, 4], curve_param_array[i, 5], \
+        #                            curve_param_array[i, 6]*M_loop[index], j ) for index, j in enumerate(B_array)] #@@@ three bands
         
-        y_2 = [mag_formula_three_band(curve_param_array[i, 0], curve_param_array[i, 1],\
-                                   curve_param_array[i, 2], curve_param_array[i, 3], \
-                                   curve_param_array[i, 4], curve_param_array[i, 5], \
-                                    curve_param_array[i, 6]*M_loop[index+lthB], j ) for index, j in enumerate(B_array)] #@@@ three bands
+        #y_2 = [mag_formula_three_band(curve_param_array[i, 0], curve_param_array[i, 1],\
+        #                           curve_param_array[i, 2], curve_param_array[i, 3], \
+        #                           curve_param_array[i, 4], curve_param_array[i, 5], \
+        #                            curve_param_array[i, 6]*M_loop[index+lthB], j ) for index, j in enumerate(B_array)] #@@@ three bands
         y = np.hstack((np.array(y_1), np.array(y_2)))
+        #y_new = [((j - np.min(y))/(np.max(y)- np.min(y))) for j in y]
         #归一化，使得他们的值都在[0,1]
-        y_new = [ (j - np.min(y))/(np.max(y)- np.min(y)) for j in y]
+        y_new = []
+        if((np.max(y)- np.min(y))>0.00001) :
+            for j in y:
+                y_new.append((j - np.min(y))/(np.max(y)- np.min(y)))         
+        else :
+            print("flat_curve")
+            for j in y:
+                y_new.append((j )/(np.max(y))*0.5)   
 
         #print(y[101], B_array[101])
         #spline = UnivariateSpline(B_array[50:150], y[50:150], s=0, k=5)
@@ -140,13 +174,12 @@ def generate_curve(start_idx, end_idx):
 
         # 提取样条参数
         #rhocurve_params.append(spline.get_coeffs())  # 样条系数
-
         rhocurve_values.append(y_new)
         #rhocurve_new_values.append(y_new)
     return np.array(rhocurve_values)#, np.array(rhocurve_new_values), np.array(rhocurve_params)
 
 # 使用 joblib 进行并行计算
-n_jobs = 50 # 使用cpu数
+n_jobs =1 # 使用cpu数
 curves_per_job = total_curve_num // n_jobs  # 每个 job 分配的曲线数量
 remainder = total_curve_num % n_jobs  # 余数，即无法整除的曲线数
 # 动态计算每个任务的起始和结束索引
@@ -171,6 +204,35 @@ results = Parallel(n_jobs=n_jobs)(
 # 汇总所有进程生成的曲线以及参数化后的结果
 all_rhocurves = results#, all_rhocurves_new,  all_rhocurves_params = zip(*results) # 解包整体结果
 all_rhocurves = np.concatenate(all_rhocurves, axis=0)
+#-------------##-------------##-------------##-------------##-------------##-------------#
+
+# fsize=30
+# index=0
+# g=0
+# #all_rhocurves = np.array([[1*i/i for i in range(1,401)]])
+# # all_rhocurves = all_rhocurves[0]
+# plt.figure(figsize=(15, 9)) 
+# print(f"{all_rhocurves:.12sf}", "###", curve_param_array)
+# #all_rhocurves = np.array(all_rhocurves)
+# plt.plot(B_array, all_rhocurves[index,0:len(B_array)],linewidth=3,linestyle='-', color='blue',label="+")
+# plt.plot(B_array, all_rhocurves[index,len(B_array):len(B_array)*2],linewidth=3,linestyle='-', color='red',label="-")
+# plt.xlabel('B(T)',fontsize=fsize)  # x 轴标签
+# plt.xticks(fontsize=fsize)
+# plt.ylabel(r'$\rho_{xx}$($a.u.$)',fontsize=fsize)  # y 轴标签
+# plt.yticks(fontsize=fsize)
+# plt.title(f'n1_{curve_param_array[index,0]:.3e}mu1_{curve_param_array[index,1]:.3e}'+\
+#                 f'n2_{curve_param_array[index,2]:.3e}mu2_{curve_param_array[index,3]:.3e}'+\
+#                     f'sigmaA_{curve_param_array[index,4]:.1e}', fontsize=20, pad=30)  # 图像标题
+# plt.legend(fontsize=18, loc='upper right', bbox_to_anchor=(1.2, 1))  # 显示图例
+# plt.subplots_adjust(right=0.85)
+# plt.tick_params(pad=8)
+# #plt.xlim(0,0.5)
+# plt.ylim(-1,1)
+# # 显示图像
+# plt.grid(True)  # 添加网格
+# plt.savefig(f"compare.png")
+# sys.exit()
+#-------------##-------------##-------------##-------------##-------------##-------------#
 #all_rhocurves_params = np.concatenate(all_rhocurves_params, axis=0)
 #all_rhocurves_new = np.concatenate(all_rhocurves_new, axis=0)
 
@@ -234,21 +296,20 @@ all_rhocurves = np.concatenate(all_rhocurves, axis=0)
 
 ###------------------- 曲线生成与参数化 -------------------###
 
-
 ###------------------- 聚类 -------------------###
-
+gnumber = 4 #类数目
 # 聚类
 def fit_kmeans(par, n_clusters) :
     kmeans = KMeans(n_clusters=n_clusters ,random_state=0).fit(par)
     labels = kmeans.labels_
-    silhouette_avg = silhouette_score(par, labels)
-    return n_clusters, labels, silhouette_avg
+    #silhouette_avg = silhouette_score(par, labels)
+    return n_clusters, labels#, silhouette_avg
 
-n_clusters_list = [13, 14]
+n_clusters_list = [gnumber]
 print(np.array(all_rhocurves).shape)
-kmeans_results = Parallel(n_jobs=2)(delayed(fit_kmeans)(all_rhocurves, n_clusters) for n_clusters in tqdm(n_clusters_list))
-n_list, label_list, avg_list  = zip(*kmeans_results)
-print(n_list, avg_list)
+kmeans_results = Parallel(n_jobs=1)(delayed(fit_kmeans)(all_rhocurves, n_clusters) for n_clusters in tqdm(n_clusters_list))
+n_list, label_list  = zip(*kmeans_results)
+print(n_list)#, avg_list)
 
 
 labels = label_list[0]
@@ -262,7 +323,22 @@ for label in unique_labels:
     all_rhocurves_clusters_index.append(indices)
 
     
+# # 使用tsne对数据进行降维
+# tsne = TSNE(n_components=2, random_state=40)
+# curves_tsne = tsne.fit_transform(all_rhocurves)
 
+# # 绘制tsne降维后的散点图
+
+
+# # 绘制tsne结果
+
+# plt.figure(figsize=(10, 5),dpi=150)
+# plt.scatter(curves_tsne[:, 0], curves_tsne[:, 1], c=labels, cmap='tab10', s=10)
+# plt.title('KMeans Clustering with TSNE')
+# plt.savefig(f"tsne.png")
+# #plt.xlabel('Principal Component 1')
+# #plt.ylabel('Principal Component 2')
+# #sys.exit()
 
 # # 创建一个字典来存储每个聚类的索引
 # cluster_indices = defaultdict(list)
@@ -271,31 +347,34 @@ for label in unique_labels:
 #     cluster_indices[label].append(idx)
 
 # 内部评价
-silhouette_avg = silhouette_score(all_rhocurves, labels)
-print("轮廓系数:", silhouette_avg)
+#silhouette_avg = silhouette_score(all_rhocurves, labels)
+#print("轮廓系数:", silhouette_avg)
 print("各类指标:", all_rhocurves_clusters_index)
 
 # 第k类
-for g in range(13) :
+for g in range(gnumber) :
     random_num = list(random.sample(range(len(all_rhocurves_clusters_index[g] )), 11))
+    #random_num = [0]
     random_index = [all_rhocurves_clusters_index[g][j] for j in random_num]
     for i,index in enumerate(random_index) :
         fsize = 30
+        #print(index)
         
         plt.figure(figsize=(15, 9)) 
-        plt.plot(B_array, all_rhocurves_clusters[g][i,0:len(B_array)],linewidth=3,linestyle='-', color='blue',label="+")
-        plt.plot(B_array, all_rhocurves_clusters[g][i,len(B_array):len(B_array)*2],linewidth=3,linestyle='-', color='red',label="-")
+        plt.plot(B_array, all_rhocurves[index,0:len(B_array)],linewidth=3,linestyle='-', color='blue',label="+")
+        plt.plot(B_array, all_rhocurves[index,len(B_array):len(B_array)*2],linewidth=3,linestyle='-', color='red',label="-")
         plt.xlabel('B(T)',fontsize=fsize)  # x 轴标签
         plt.xticks(fontsize=fsize)
-        plt.ylabel(r'$\rho_{xx}$($\Omega \cdot m$)',fontsize=fsize)  # y 轴标签
+        plt.ylabel(r'$\rho_{xx}$($a.u.$)',fontsize=fsize)  # y 轴标签
         plt.yticks(fontsize=fsize)
-        plt.title(f'sigma1_{curve_param_array[index,0]:.1e}mu1_{curve_param_array[index,1]:.1e}'+\
-                f'sigma2_{curve_param_array[index,2]:.1e}mu2_{curve_param_array[index,3]:.1e}sigmaA_{curve_param_array[index,4]:.1e}', fontsize=24, pad=30)  # 图像标题
+        plt.title(f'n1_{curve_param_array[index,0]:.3e}mu1_{curve_param_array[index,1]:.3e}'+\
+                f'n2_{curve_param_array[index,2]:.3e}mu2_{curve_param_array[index,3]:.3e}sigmaA_{curve_param_array[index,4]:.1e}', fontsize=20, pad=30)  # 图像标题
         plt.legend(fontsize=18, loc='upper right', bbox_to_anchor=(1.2, 1))  # 显示图例
         plt.subplots_adjust(right=0.85)
         plt.tick_params(pad=8)
         #plt.xlim(0,0.5)
-        #plt.ylim(0,40)
+        #plt.xlim(0,0.5)
+        plt.ylim(-1,1)
         # 显示图像
         plt.grid(True)  # 添加网格
         plt.savefig(f"g={g}_{index}.png")
