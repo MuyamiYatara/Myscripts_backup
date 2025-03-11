@@ -3,7 +3,7 @@
 #SBATCH -N 1
 #SBATCH -n 112
 #SBATCH -A hmt03
-#SBATCH -p bigmem 
+#SBATCH -p regular,regular6430 
 #SBATCH --job-name=Fe3GaD03
 #SBATCH --output=./log 
 #SBATCH --error=./err 

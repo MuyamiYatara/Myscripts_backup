@@ -3,7 +3,7 @@
 #SBATCH -N 2
 #SBATCH -n 112
 #SBATCH -A hmt03  
-#SBATCH -p regular
+#SBATCH -p regular,regular6430
 #SBATCH --job-name=NaN
 #SBATCH --output=./log 
 #SBATCH --error=./err
