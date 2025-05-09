@@ -343,10 +343,10 @@ vaspkit.communicate(input=command_sc_inputs)
 
 ##### edit the sbatch script #####
 sbatch_para = {
-    '#SBATCH -N': 2,
-    '#SBATCH -n': 112,
+    '#SBATCH -N': 1,
+    '#SBATCH -n': 56,
     '#SBATCH -A': 'hmt03',  
-    '#SBATCH -p': 'regular',
+    '#SBATCH -p': 'regular,regular6430',
 }
 edit_sbatch_script(sbatch_para)
 
@@ -368,7 +368,7 @@ SCF_para = {
     'LSORBIT': '.TRUE.',
     'MAGMOM': '0 0 0 0 0 0  2 2 2 2 2 2  0'
     # "NPAR":"32",
-    # 'NBANDS':'256'
+    'NBANDS':'112'
 
 }
 edit_INCAR(SCF_para)
