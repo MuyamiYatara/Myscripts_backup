@@ -51,6 +51,7 @@ class EBSPlot:
         config_manager=ConfigManager(os.path.join(ROOT,'pyprocar','cfg','band_structure.yml'))
         config_manager.update_config(kwargs)  
         self.config=config_manager.get_config()
+        print(self.config)
 
         self.ebs = ebs
         self.kpath = kpath
@@ -587,6 +588,7 @@ class EBSPlot:
         if major is not None and minor is not None:
             self.ax.yaxis.set_major_locator(MultipleLocator(major))
             self.ax.yaxis.set_minor_locator(MultipleLocator(minor))
+        my_font_path = os.path.expanduser('~/Myscripts/open-sans/OpenSans-Semibold.ttf')
         bold_font = font_manager.FontProperties(weight='medium', size=27, fname=my_font_path)
         for label in self.ax.get_yticklabels():
             label.set_fontproperties(bold_font)
@@ -650,6 +652,7 @@ class EBSPlot:
         label : str, optional
             String fo the y label name, by default r"E - E$ (eV)"
         """
+        my_font_path = os.path.expanduser('~/Myscripts/open-sans/OpenSans-Semibold.ttf')
         bold_font = font_manager.FontProperties(weight='medium', size=27, fname=my_font_path)
         self.ax.set_ylabel("Energy (eV)", fontproperties=bold_font, labelpad=15)
 
@@ -665,9 +668,10 @@ class EBSPlot:
         self.ax.spines['bottom'].set_linewidth(1.5) # 下边框粗细
         self.ax.spines['left'].set_linewidth(1.5)   # 左边框粗细
         self.ax.spines['right'].set_linewidth(1.5)  # 右边框粗细
-
+        my_font_path = os.path.expanduser('~/Myscripts/open-sans/OpenSans-Semibold.ttf')
         bold_font = font_manager.FontProperties(weight='medium', size=27, fname=my_font_path)
         if self.config['title']['value']:
+            print(self.config['title']['value'])
             self.ax.set_title(label=self.config['title']['value'], fontproperties=bold_font, pad=15)
 
     def set_colorbar_title(self, title:str=None):
