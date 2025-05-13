@@ -523,10 +523,11 @@ class EBSPlot:
         """
 
         if self.kpath is not None:
-            bold_font = font_manager.FontProperties(weight='medium', size=27, fname='/usr/share/fonts/open-sans/OpenSans-Semibold.ttf')
-            font_paths = font_manager.findSystemFonts(fontpaths=None, fontext='ttf')
-            for font in font_paths:
-                print(font)
+            my_font_path = os.path.expanduser('~/Myscripts/open-sans/OpenSans-Semibold.ttf')
+            bold_font = font_manager.FontProperties(weight='medium', size=27, fname=my_font_path)
+            #font_paths = font_manager.findSystemFonts(fontpaths=None, fontext='ttf')
+            #for font in font_paths:
+            #    print(font)
             if tick_positions is None:
                 tick_positions = self.kpath.tick_positions
             if tick_names is None:
@@ -586,7 +587,7 @@ class EBSPlot:
         if major is not None and minor is not None:
             self.ax.yaxis.set_major_locator(MultipleLocator(major))
             self.ax.yaxis.set_minor_locator(MultipleLocator(minor))
-        bold_font = font_manager.FontProperties(weight='medium', size=27, fname='/usr/share/fonts/open-sans/OpenSans-Semibold.ttf')
+        bold_font = font_manager.FontProperties(weight='medium', size=27, fname=my_font_path)
         for label in self.ax.get_yticklabels():
             label.set_fontproperties(bold_font)
         self.ax.tick_params(
@@ -649,7 +650,7 @@ class EBSPlot:
         label : str, optional
             String fo the y label name, by default r"E - E$ (eV)"
         """
-        bold_font = font_manager.FontProperties(weight='medium', size=27, fname='/usr/share/fonts/open-sans/OpenSans-Semibold.ttf')
+        bold_font = font_manager.FontProperties(weight='medium', size=27, fname=my_font_path)
         self.ax.set_ylabel("Energy (eV)", fontproperties=bold_font, labelpad=15)
 
     def set_title(self, title:str="Band Structure"):
@@ -665,7 +666,7 @@ class EBSPlot:
         self.ax.spines['left'].set_linewidth(1.5)   # 左边框粗细
         self.ax.spines['right'].set_linewidth(1.5)  # 右边框粗细
 
-        bold_font = font_manager.FontProperties(weight='medium', size=27, fname='/usr/share/fonts/open-sans/OpenSans-Semibold.ttf')
+        bold_font = font_manager.FontProperties(weight='medium', size=27, fname=my_font_path)
         if self.config['title']['value']:
             self.ax.set_title(label=self.config['title']['value'], fontproperties=bold_font, pad=15)
 
