@@ -284,6 +284,19 @@ def edit_win(lattice_vec, atom_pos, kpath):
 
     print("wannier90.win基本参数填写完成。")
 
+def replace_hr_plot():
+    """
+    将文件中所有 'hr_plot' 替换为 'write_hr'。
+    """
+    file_path = "wannier90.win"
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    new_content = content.replace('hr_plot', 'write_hr')
+    with open(file_path, 'w') as f:
+        f.write(new_content)
+
+
 def submit_sbatch_script(script_path):
     """Submit a job with sbatch and return the job ID."""
     # 提交脚本并捕获输出
@@ -297,6 +310,7 @@ def submit_sbatch_script(script_path):
     job_id = result.stdout.split()[-1]  # sbatch 输出通常以 "Submitted batch job <job_id>" 形式返回
     print(f"submit successfully,job ID: {job_id}")
     return job_id
+
 
 def monitor_job(job_id):
     """Monitor the status of a job using squeue and display runtime."""
@@ -568,6 +582,7 @@ if (wr == 1) :
     }
     edit_sbatch_script(sbatch_para)
     jobid = submit_sbatch_script(sbatch_script_name)
+    replace_hr_plot() #在这里用wannier90 v3.1并行运行wannier90,但前面是wannier90 v2.1的接口,因此要把hr_plot改成write_hr
     monitor_job(jobid)
 
     input_file = 'wannier90_band.gnu'
