@@ -419,6 +419,15 @@ edit_INCAR(BD_para)
 vaspkit.communicate(command_bd_inputs)
 sp.run(['cp', 'KPATH.in', 'KPOINTS'])
 
+# modify the number of kpoints 
+knum = '    70'
+with open('KPOINTS', 'r') as f:
+    lines = f.readlines()
+if len(lines) >= 2:
+    lines[1] = knum.rstrip('\n') + '\n'  # 替换第二行，确保只有一个换行符
+with open('KPOINTS', 'w', encoding='utf-8') as f:
+    f.writelines(lines)
+
 # edit fatband_generate.py, without fermi energy
 
 # 初始化列表
