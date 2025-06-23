@@ -525,10 +525,10 @@ os.chdir('..')
 #-#---------------------------generate the input files---------------------------#-#
 
 #-#---------------------------submit and watch---------------------------#-#
-scf = 1
-bd = 1
-wrscf = 11
-wr = 11
+scf = 11
+bd = 11
+wrscf = 1
+wr = 1
 #efermi = get_fermi_energy()
 #print(efermi)
 
@@ -568,12 +568,12 @@ if (wrscf == 1) :
 if (wr == 1) :
     efermi = get_fermi_energy()
     os.chdir('./WR')
-    sbatch_script_name = 'W90.sh'
+    sbatch_script_name = 'HMW90.sh'
     sbatch_para = {
         '#SBATCH -N': 1,
-        '#SBATCH -n': 64,
+        '#SBATCH -n': 52,
         '#SBATCH -A': 'hmt03',  
-        '#SBATCH -p': 'regular6430',
+        '#SBATCH -p': 'regular',
     }
     edit_sbatch_script(sbatch_para)
     jobid = submit_sbatch_script(sbatch_script_name)
