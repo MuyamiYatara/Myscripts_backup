@@ -378,11 +378,13 @@ SCF_para = {
     'ENCUT': encut,
     "LORBMOM": ".TRUE.",
     "LWAVE":".FALSE.",
-    'ISPIN': '1',
+    "NELM":"200",
+    'ISPIN': '2',
     'LSORBIT': '.TRUE.',
-    'MAGMOM': '0 0 0 0 0 0  2 2 2 2 2 2  0'
+    'MAGMOM': '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0  0 0 2 0 0 -2 0 0 2 0 0 -2 0 0 2 0 0 -2  0 0 0',
+    'SAXIS': '0 0 1',
     # "NPAR":"32",
-    'NBANDS':'112'
+    'NBANDS':'320'
 
 }
 edit_INCAR(SCF_para)
