@@ -1,9 +1,9 @@
 #!/bin/bash
 #
 #SBATCH -N 1
-#SBATCH -n 112
+#SBATCH -n 64
 #SBATCH -A hmt03
-#SBATCH -p bigmem 
+#SBATCH -p test
 #SBATCH --job-name=Fe3GaD03
 #SBATCH --output=./log 
 #SBATCH --error=./err 
@@ -32,7 +32,7 @@ echo ”A total of $SLURM_NTASKS tasks is used”
 #export LD_LIBRARY_PATH=/usr/local/lib64:$LD_LIBRARY_PATH
 
 #mpirun -np 1 wannier90.x ./wannier90
- mpirun /home/apps/wannier90-1.2/wannier90.x ./wannier90
+mpirun /data/home/apps/wannier90-3.1.0/wannier90.x ./wannier90
 
 
   
