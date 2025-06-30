@@ -376,6 +376,7 @@ SCF_para = {
     'ISIF': 'delete',
     'EDIFFG': 'delete',
     'ENCUT': encut,
+    'LORBIT':'11',
     "LORBMOM": ".TRUE.",
     "LWAVE":".FALSE.",
     "NELM":"200",
