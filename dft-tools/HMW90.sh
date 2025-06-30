@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #
-#SBATCH -N 2
+#SBATCH -N 1
 #SBATCH -p regular
 #SBATCH --ntasks-per-node=52
 #SBATCH --job-name=NaN
