@@ -3,6 +3,7 @@ import re
 import copy
 import os
 import time
+import tempfile
 
 
 #------------------functions------------------#
@@ -296,7 +297,6 @@ def replace_hr_plot():
     with open(file_path, 'w') as f:
         f.write(new_content)
 
-
 def submit_sbatch_script(script_path):
     """Submit a job with sbatch and return the job ID."""
     # 提交脚本并捕获输出
@@ -310,7 +310,6 @@ def submit_sbatch_script(script_path):
     job_id = result.stdout.split()[-1]  # sbatch 输出通常以 "Submitted batch job <job_id>" 形式返回
     print(f"submit successfully,job ID: {job_id}")
     return job_id
-
 
 def monitor_job(job_id):
     """Monitor the status of a job using squeue and display runtime."""
@@ -380,12 +379,12 @@ SCF_para = {
     "LORBMOM": ".TRUE.",
     "LWAVE":".FALSE.",
     "NELM":"200",
-    'ISPIN': '2',
+    'ISPIN': '1',
     'LSORBIT': '.TRUE.',
-    'MAGMOM': '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0  0 0 2 0 0 -2 0 0 2 0 0 -2 0 0 2 0 0 -2  0 0 0',
+    'MAGMOM': '0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0',
     'SAXIS': '0 0 1',
     # "NPAR":"32",
-    'NBANDS':'320'
+    'NBANDS':'224'
 
 }
 edit_INCAR(SCF_para)
@@ -543,8 +542,9 @@ os.chdir('..')
 #-#---------------------------generate the input files---------------------------#-#
 
 #-#---------------------------submit and watch---------------------------#-#
-scf = 1
-bd = 1
+scf = 11
+bd = 11
+autowr = 1
 wrscf = 11
 wr = 11
 #efermi = get_fermi_energy()
@@ -573,6 +573,26 @@ if (bd == 1) :
     vaspkit.communicate(command_bd_inputs)
     print("BD completed")
     os.chdir('..')
+
+
+
+#------------------auto construction of wannier90.win(Yuzhi Wang)------------------#
+if (autowr == 1) :
+    os.chdir('./WR')
+    sp.run(["cp",f"/data/home/ycshen/Myscripts/dft-tools/autoconstruction.py","./"])
+    sp.run(["conda", "run", "-n", "mp_api", "python", "autoconstruction.py"])
+    
+    #与wannier90.win_backup合并，形成最后需要的wannier90.win
+    with open("wannier90.win_auto", "r") as fa, open("wannier90.win_backup", "r") as fb, open("wannnier90.win", "w") as fc:
+
+        fc.write(fa.read())
+        fc.write("\n")   
+        fc.write(fb.read())
+
+    os.chdir('..')
+    print("自动化构建wannier.win完成")
+
+
 
 #------------------wannier90.win prepared------------------#
 if (wrscf == 1) :
