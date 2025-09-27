@@ -1,0 +1,57 @@
+&TB_FILE
+Hrfile = 'Fe3Ga_L12_hr.dat'
+Package = 'VASP'             ! obtained from VASP, it could be 'VASP', 'QE', 'Wien2k', 'OpenMx'
+/
+
+!> bulk band structure calculation flag
+&CONTROL
+FindNodes_calc		  = T
+/
+
+&SYSTEM
+SOC = 1                 ! soc
+E_FERMI = 6.67     ! e-fermi
+/
+
+&PARAMETERS
+Nk1 = 9        ! number k points  odd number would be better
+Nk2 = 9        ! number k points  odd number would be better
+Nk3 = 9        ! number k points  odd number would be better 
+Gap_threshold = 0.0001         
+/
+
+LATTICE
+Angstrom
+   3.6380282533333337    0.0000000000000000    0.0000000000000002
+   0.0000000000000006    3.6380282533333337    0.0000000000000002
+   0.0000000000000000    0.0000000000000000    3.6380282533333337
+
+ATOM_POSITIONS
+4                               ! number of atoms for projectors
+Direct                          ! Direct or Cartisen coordinate
+Fe   0.0000000000000000    0.5000000000000000    0.5000000000000000 
+Fe   0.5000000000000000    0.5000000000000000    0.0000000000000000 
+Fe   0.5000000000000000    0.0000000000000000    0.5000000000000000 
+Ga   0.0000000000000000    0.0000000000000000    0.0000000000000000 
+
+PROJECTORS
+ 9 9 9 4                  ! number of projectors
+ Fe s px py pz dz2 dxz dyz dx2-y2 dxy
+ Fe s px py pz dz2 dxz dyz dx2-y2 dxy
+ Fe s px py pz dz2 dxz dyz dx2-y2 dxy
+ Ga s px py pz 
+
+
+SURFACE            ! Specify surface with two vectors, see doc
+ 1  0  0
+ 0  1  0
+ 0  0  1
+
+
+
+KCUBE_BULK
+ 0.00  0.00  0.00   ! Original point for 3D k plane 
+ 1.00  0.00  0.00   ! The first vector to define 3d k space plane
+ 0.00  1.00  0.00   ! The second vector to define 3d k space plane
+ 0.00  0.00  1.00   ! The third vector to define 3d k cube
+

@@ -6,8 +6,8 @@ spins_mode = "[0,1]" # spin plot mode, "[0,1]" for spin considered DFT, band spi
 Emin = '-15'
 Emax = '30'
 cmap = "\'hot_r\'" # the pattern of color map, see more in "https://zhuanlan.zhihu.com/p/114420786",spins can use seismic, orbitals can use hot_r
-targetelements = ['Fe', 'Fe', 'Fe', 'Pt', 'Pt', 'Pt']
-targetorbitals = ['s', 'p', 'd', 's', 'p', 'd']
+targetelements = ['Dy', 'Dy', 'Dy', 'Fe', 'Fe', 'Fe', 'O', 'O', 'O']
+targetorbitals = ['s', 'p', 'd', 's', 'p', 'd', 's', 'p', 'd']
 fermienergy = '7.1567'
 
 #####################  Custom Variables  #######################
@@ -28,8 +28,8 @@ with open("POSCAR",mode="r") as poscar:
 names = names.rstrip("\n")
 numbers = numbers.rstrip("\n")
 
-names = names.split(" ")
-numbers = numbers.split(" ")
+names = names.split()
+numbers = numbers.split()
 #print(len(names))
 i = 0
 j = 0
@@ -39,6 +39,7 @@ while True :
         break
     tmp = []
     for k in range(int(numbers[i])):
+        
         tmp.append(j)
         j = j + 1
     atoms_index.append(str(tmp))
