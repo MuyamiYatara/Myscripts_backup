@@ -156,6 +156,19 @@ def get_fermi_energy():
                 return float(fermi_energy)  # 转换为浮点数并返回
     return None  # 如果没有找到匹配项
 
+def get_num_wann(win_file="wannier90.win"):
+    num_wann = None
+    with open(win_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line.lower().startswith("num_wann"):
+                # 支持格式 "num_wann = 9" 或 "num_wann=9"
+                parts = line.replace(" ", "").split("=")
+                if len(parts) == 2:
+                    num_wann = int(parts[1])
+                break
+    return num_wann
+
 def modify_and_copy_file(input_file, output_file, ef):
     # 正则表达式模式，匹配 "set arrow from xxx, xxx to xxx, xxx nohead" 这种行
     arrow_pattern = r"set arrow from\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\s*to\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\s*nohead"
@@ -231,21 +244,65 @@ def read_KPOINTS():
 
     return formatted_lines
 
-def read_POSCAR():
-    with open("POSCAR", 'r') as f:
-        lines = f.readlines()
-    
-    lines = [i.strip() for i in lines]
-    # 筛选出含有坐标的行（排除空行和其他非数据行）
-    lattice_data = lines[2:5]
-    atom_data = lines[8:]
+def read_POSCAR(poscar_file="POSCAR"):
+    with open(poscar_file, 'r') as f:
+        lines = [line.strip() for line in f if line.strip()]
+
+    # 找到 Direct/Cartesian 行
+    coord_start = None
+    for i, line in enumerate(lines):
+        if line.lower().startswith("direct") or line.lower().startswith("cartesian"):
+            coord_start = i + 1
+            break
+
+    if coord_start is None:
+        raise ValueError("POSCAR 文件中找不到 Direct 或 Cartesian 行")
+
+    # 元素名行和数量行就在 Direct/Cartesian 上方两行
+    elem_line = lines[coord_start - 3]
+    num_line = lines[coord_start - 2]
+
+    elements = elem_line.split()
+    numbers = [int(x) for x in re.findall(r"\d+", num_line)]
+
+    if len(elements) != len(numbers):
+        raise ValueError(f"元素名数量与原子数不匹配: {elements} vs {numbers}")
+
+    # 构建原子名列表
+    atom_names = []
+    for elem, n in zip(elements, numbers):
+        atom_names.extend([elem] * n)
+
+    # 读取坐标
+    coords_lines = lines[coord_start:coord_start + len(atom_names)]
+
+    # 格式化输出
     formatted_lines = []
-    for i in range(0, len(atom_data)):
-        #注意这里要求POSCAR的原子坐标后面必须接有原子名称，不然正则表达式会匹配不到
-        start = re.match(r"([\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+)\s+(\w+)", atom_data[i])
-        formatted_lines.append(f"{start.group(2)} {start.group(1)}")
+    for name, coord in zip(atom_names, coords_lines):
+        parts = coord.split()
+        formatted_lines.append(f"{name} {parts[0]} {parts[1]} {parts[2]}")
+
+    # 晶格向量
+    lattice_data = lines[2:5]
+
+    return lattice_data, formatted_lines
+
+
+# def read_POSCAR():
+#     with open("POSCAR", 'r') as f:
+#         lines = f.readlines()
     
-    return lattice_data, formatted_lines 
+#     lines = [i.strip() for i in lines]
+#     # 筛选出含有坐标的行（排除空行和其他非数据行）
+#     lattice_data = lines[2:5]
+#     atom_data = lines[8:]
+#     formatted_lines = []
+#     for i in range(0, len(atom_data)):
+#         #注意这里要求POSCAR的原子坐标后面必须接有原子名称，不然正则表达式会匹配不到
+#         start = re.match(r"([\d\.\-]+\s+[\d\.\-]+\s+[\d\.\-]+)\s+(\w+)", atom_data[i])
+#         formatted_lines.append(f"{start.group(2)} {start.group(1)}")
+    
+#     return lattice_data, formatted_lines 
 
 def edit_win(lattice_vec, atom_pos, kpath):
     with open("wannier90.win_backup", "r") as file:
@@ -359,7 +416,7 @@ sbatch_para = {
     '#SBATCH -N': 1,
     '#SBATCH -n': 56,
     '#SBATCH -A': 'hmt03',  
-    '#SBATCH -p': 'regular,regular6430',
+    '#SBATCH -p': 'test',
 }
 edit_sbatch_script(sbatch_para)
 
@@ -379,12 +436,15 @@ SCF_para = {
     "LORBMOM": ".TRUE.",
     "LWAVE":".FALSE.",
     "NELM":"200",
-    'ISPIN': '1',
-    'LSORBIT': '.TRUE.',
-    'MAGMOM': '0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0',
+    #这几个参数关系到后面做wannier的时候up和down是否分开做，因此必须给出
+    'ISPIN': '2', #注意这里'2'不能有空格
+    'LSORBIT': '.FALSE.',#这里.FALSE.必须是大写且带点
+    'MAGMOM': '3 3 0 0 0 0',#这里的MAGMOM必须要单独每个原子写一个，如果开SOC就每个原子写三个方向的
+    #这几个参数关系到后面做wannier的时候up和down是否分开做，因此必须给出
     'SAXIS': '0 0 1',
+    #'LNONCOLINEAR': 'TRUE',
     # "NPAR":"32",
-    'NBANDS':'224'
+    'NBANDS':'112'
 
 }
 edit_INCAR(SCF_para)
@@ -506,10 +566,12 @@ cp_nano = sp.Popen(["cp", f"../{sbatch_script_name}", "./"])
 win = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/wannier90.win_backup", "./"])
 w90 = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/W90.sh", "./"])
 w9gnu = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/w9.gnu", "./"])
+w9nsocgnu = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/w9_nsoc.gnu", "./"])
 
 win.communicate()
 w90.communicate()
 w9gnu.communicate()
+w9nsocgnu.communicate()
 cp_incar.communicate()
 cp_poscar.communicate()
 cp_potcar.communicate()
@@ -545,8 +607,8 @@ os.chdir('..')
 scf = 11
 bd = 11
 autowr = 1
-wrscf = 11
-wr = 11
+wrscf = 1
+wr = 1
 #efermi = get_fermi_energy()
 #print(efermi)
 
@@ -579,17 +641,66 @@ if (bd == 1) :
 #------------------auto construction of wannier90.win(Yuzhi Wang)------------------#
 if (autowr == 1) :
     os.chdir('./WR')
+    if (SCF_para['ISPIN'] == '2') and (SCF_para['LSORBIT'] == '.FALSE.'):
+        print("上下自旋分开，需要计算SOC_SCF")
+        sp.run(['mkdir','-p','SOC_SCF'])
+        sp.run(["cp","./POSCAR","./SOC_SCF/"])
+        sp.run(["cp","./POTCAR","./SOC_SCF/"])
+        sp.run(["cp","./KPOINTS","./SOC_SCF/"])
+        sp.run(["cp","./INCAR","./SOC_SCF/"])
+
+        os.chdir('./SOC_SCF')
+        SCF_para['LSORBIT'] == '.TRUE.'
+        mags = re.findall(r"\d+", SCF_para['MAGMOM'])
+        # 给每个数字前加两个 0
+        new_mags = ["0 0 " + n for n in mags]
+        # 拼接成字符串
+        SCF_para['MAGMOM'] = " ".join(new_mags)
+        SCF_para['ICHARG'] = "delete"
+        edit_INCAR(SCF_para)
+        jobid = submit_sbatch_script(sbatch_script_name)
+        monitor_job(jobid)
+        print("SOC_SCF completed")
+        sp.run(["cp","./vasprun.xml","../"])
+        os.chdir('../')
+    else :
+        sp.run(["cp","../vasprun.xml","./"])
+    
     sp.run(["cp",f"/data/home/ycshen/Myscripts/dft-tools/autoconstruction.py","./"])
     sp.run(["conda", "run", "-n", "mp_api", "python", "autoconstruction.py"])
-    
     #与wannier90.win_backup合并，形成最后需要的wannier90.win
-    with open("wannier90.win_auto", "r") as fa, open("wannier90.win_backup", "r") as fb, open("wannnier90.win", "w") as fc:
+    with open("wannier90.win_auto", "r") as fa, open("wannier90.win_backup", "r") as fb, open("wannier90.win", "w") as fc:
 
         fc.write(fa.read())
         fc.write("\n")   
         fc.write(fb.read())
 
+    if (SCF_para['ISPIN'] == '2') and (SCF_para['LSORBIT'] == '.FALSE.'):
+        with open(win_file, "r") as f:
+            lines = f.readlines()
+
+        new_lines = []
+        for line in lines:
+            # 替换 num_wann
+            m = re.match(r"(\s*num_wann\s*=\s*)(\d+)", line, re.IGNORECASE)
+            if m:
+                old_num = int(m.group(2))
+                new_num = old_num // 2  # 除以2
+                line = f"{m.group(1)}{new_num}\n"
+
+            # 删除 spinors=.True. 行
+            if "spinors" in line.lower():
+                continue
+
+            new_lines.append(line)
+
+        # 写回文件
+        with open(win_file, "w") as f:
+            f.writelines(new_lines)
+
+
     os.chdir('..')
+
     print("自动化构建wannier.win完成")
 
 
@@ -603,28 +714,90 @@ if (wrscf == 1) :
     print("WR SCF completed")
     os.chdir('..')
 
+
 if (wr == 1) :
+
     efermi = get_fermi_energy()
     os.chdir('./WR')
     sbatch_script_name = 'W90.sh'
     sbatch_para = {
         '#SBATCH -N': 1,
-        '#SBATCH -n': 64,
+        '#SBATCH -n': 56,
         '#SBATCH -A': 'hmt03',  
-        '#SBATCH -p': 'regular6430',
+        '#SBATCH -p': 'test',
     }
     edit_sbatch_script(sbatch_para)
-    jobid = submit_sbatch_script(sbatch_script_name)
     replace_hr_plot() #在这里用wannier90 v3.1并行运行wannier90,但前面是wannier90 v2.1的接口,因此要把hr_plot改成write_hr
-    monitor_job(jobid)
 
-    input_file = 'wannier90_band.gnu'
-    output_file = 'w9.gnu'
-    modify_and_copy_file(input_file, output_file, efermi)
+    #------------------handle with up and down separately------------------#
+    dn_amn = "wannier90.dn.amn"
+    dn_mmn = "wannier90.dn.mmn"
+    dn_eig = "wannier90.dn.eig"
+    up_amn = "wannier90.up.amn"
+    up_mmn = "wannier90.up.mmn"
+    up_eig = "wannier90.up.eig"
 
-    sp.run(["gnuplot", "w9.gnu"])
+    # 检查文件是否都存在
+    if os.path.exists(dn_amn) and os.path.exists(dn_mmn) and os.path.exists(dn_eig) and os.path.exists(up_amn) and os.path.exists(up_mmn) and os.path.exists(up_eig):
+        # 创建文件夹
+        sp.run(["mkdir", "-p", "dn"])
+        sp.run(["mkdir", "-p", "up"])
+
+        # 拷贝并改名
+        sp.run(["cp", dn_amn, "dn/wannier90.amn"])
+        sp.run(["cp", dn_mmn, "dn/wannier90.mmn"])
+        sp.run(["cp", dn_eig, "dn/wannier90.eig"])
+        sp.run(["cp", "./wannier90.win", "dn/wannier90.win"])
+        sp.run(["cp", sbatch_script_name, "dn/"+sbatch_script_name])
+
+        sp.run(["cp", up_amn, "up/wannier90.amn"])
+        sp.run(["cp", up_mmn, "up/wannier90.mmn"])
+        sp.run(["cp", up_eig, "up/wannier90.eig"])
+        sp.run(["cp", "./wannier90.win", "up/wannier90.win"])
+        sp.run(["cp", sbatch_script_name, "up/"+sbatch_script_name])
+
+        #dn calculation
+        os.chdir('./dn')
+        jobid = submit_sbatch_script(sbatch_script_name)
+        monitor_job(jobid)
+        os.chdir('..')
+
+        os.chdir('./up')
+        jobid = submit_sbatch_script(sbatch_script_name)
+        monitor_job(jobid)
+        os.chdir('..')
+
+        sp.run(["cp", "dn/wannier90_hr.dat", "down_hr.dat"])
+        sp.run(["cp", "up/wannier90_hr.dat", "up_hr.dat"])
+        sp.run(["cp",f"/data/home/ycshen/Myscripts/dft-tools/spinHr_wo_soc.exe","./"])
+        numwann = get_num_wann()
+        sp.run(["./spinHr_wo_soc.exe",f"{numwann}"])
+
+        sp.run(["cp", "dn/wannier90_band.dat", "wannier90_dn.dat"])
+        sp.run(["cp", "up/wannier90_band.dat", "wannier90_up.dat"])
+        sp.run(["cp", "up/wannier90_band.gnu", "wannier90_band.gnu"])
+
+        input_file = 'wannier90_band.gnu'
+        output_file = 'w9_nsoc.gnu'
+        modify_and_copy_file(input_file, output_file, efermi)
+        sp.run(["gnuplot", "w9_nsoc.gnu"])
+
+    elif os.path.exists(dn_amn) and os.path.exists(dn_mmn) and os.path.exists(dn_eig):
+        jobid = submit_sbatch_script(sbatch_script_name)
+        monitor_job(jobid)
+
+        input_file = 'wannier90_band.gnu'
+        output_file = 'w9.gnu'
+        modify_and_copy_file(input_file, output_file, efermi)
+        sp.run(["gnuplot", "w9.gnu"])
+
+        
+    else:
+        print("缺少必要的.amn .mmn或.eig文件。")
+
+
+
     sbatch_script_name = 'NANO.sh'
-
     os.chdir('..')
 
 

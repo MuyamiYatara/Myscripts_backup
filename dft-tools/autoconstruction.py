@@ -296,6 +296,6 @@ def convert_kpoints_format(kpoints_file, win_file):
 if __name__ == '__main__':
     pass
 
-a = winzz('../vasprun.xml')
+a = winzz('./vasprun.xml')
 a.output(froz=[True, 1])
 # convert_kpoints_format("../band/KPOINTS", "wannier90.win")

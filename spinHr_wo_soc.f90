@@ -3,7 +3,22 @@
 program main
    implicit none
    !@ Here set the Number of wannier orbitals without spin 
-   integer :: num_of_orbital= 31
+   integer :: num_of_orbital
+   integer :: ios
+   character(len=32) :: arg
+
+   ! 获取命令行的第一个参数
+   call get_command_argument(1, arg)
+
+   ! 将字符型转换为整数
+   read(arg, *, iostat=ios) num_of_orbital
+   if (ios /= 0) then
+      print *, "Error: invalid input argument."
+      stop
+   end if
+
+   print *, "num_of_orbital =", num_of_orbital
+
 
    call generate_HmnR(num_of_orbital)
    
