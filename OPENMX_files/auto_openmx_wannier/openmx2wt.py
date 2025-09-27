@@ -194,11 +194,7 @@ Orthogonal_Basis = F
 !> bulk band structure calculation flag
 &CONTROL
 BulkBand_calc         = T
-Dos_calc              = F
-BulkBand_points_calc  = F
-Z2_3D_calc            = F
-Wanniercenter_calc    = F
-SlabBand_calc         = F
+FindNodes_calc        = T
 /
                        
 &SYSTEM
@@ -209,12 +205,10 @@ E_FERMI = -4.4195        ! e-fermi
 /
 
 &PARAMETERS
-Nk1 = 41            ! number k points  odd number would be better
-Nk2 = 41            ! number k points  odd number would be better
-Nk3 = 41            ! number k points  odd number would be better
-OmegaNum= 101          ! for DOS
-OmegaMin= -5            ! in eV
-OmegaMax=  5            ! in eV
+Nk1 = 9            ! number k points  odd number would be better
+Nk2 = 9            ! number k points  odd number would be better
+Nk3 = 9            ! number k points  odd number would be better
+Gap_threshold = 0.0001
 /
 
 SURFACE            ! (001) surface
