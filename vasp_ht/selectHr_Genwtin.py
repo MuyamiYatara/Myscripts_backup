@@ -93,36 +93,136 @@ def main():
 
 
 # ===================== 基本工具 =====================
-import os, re, shutil
-from pymatgen.io.vasp.outputs import Vasprun
 
-# ------- 替换 wt.in 中的某个大写标题区块 -------
+
 def _replace_section(text, header, new_block):
+    """用 new_block 替换以 header 开头的区块；没有则在末尾追加。"""
     title_re = re.compile(r"^[A-Z_ ]+\s*$", re.M)
     m = re.search(rf"(?m)^{re.escape(header)}\s*$", text)
     if not m:
-        if not text.endswith("\n"): text += "\n"
-        return text + "\n" + new_block + ("\n" if not new_block.endswith("\n") else "")
+        if not text.endswith("\n"):
+            text += "\n"
+        if not new_block.endswith("\n"):
+            new_block += "\n"
+        return text + "\n" + new_block
+
     start = m.start()
     m2 = title_re.search(text, pos=m.end()+1)
     end = m2.start() if m2 else len(text)
+
     before, after = text[:start], text[end:]
-    if not before.endswith("\n"): before += "\n"
-    if not new_block.endswith("\n"): new_block += "\n"
+    if not before.endswith("\n"):
+        before += "\n"
+    if not new_block.endswith("\n"):
+        new_block += "\n"
     return before + new_block + after
 
-# ------- 确保 LATTICE 和 ATOM_POSITIONS 之间多一空行 -------
 def _ensure_extra_blank_line_between_blocks(text):
-    # LATTICE 和 ATOM_POSITIONS 之间
+    """确保关键区块之间至少有一行空白。"""
+    # LATTICE 和 ATOM_POSITIONS
     text = re.sub(r'(?ms)(^LATTICE.*?\n)(^ATOM_POSITIONS\b)', r'\1\n\2', text)
-    # ATOM_POSITIONS 和 PROJECTORS 之间
+    # ATOM_POSITIONS 和 PROJECTORS
     text = re.sub(r'(?ms)(^ATOM_POSITIONS.*?\n)(^PROJECTORS\b)', r'\1\n\2', text)
-    # PROJECTORS 和 KCUBE_BULK 之间
+    # PROJECTORS 和 KCUBE_BULK（若模板含该块）
     text = re.sub(r'(?ms)(^PROJECTORS.*?\n)(^KCUBE_BULK\b)', r'\1\n\2', text)
     return text
 
-# ------- 解析 wannier90.win 的 Projections -------
-def _parse_win_projections(win_path):
+def _replace_key_value_lines(text, hr_filename, efermi):
+    """替换 Hrfile 与 E_FERMI（保留原行注释）。"""
+    text = re.sub(r"(?m)^\s*Hrfile\s*=\s*'.*?'\s*$",
+                  f"Hrfile = '{hr_filename}'", text)
+    def _repl_ef(m):
+        parts = m.group(0).split("!")
+        new = f"E_FERMI = {efermi:.6f}"
+        if len(parts) > 1:
+            new += "    !" + "!".join(parts[1:])
+        return new
+    text = re.sub(r"(?m)^\s*E_FERMI\s*=\s*.*$", _repl_ef, text)
+    return text
+
+# ===== POSCAR 解析 & 格式化 =====
+
+def _parse_poscar(poscar_path):
+    """返回: (expanded_symbols, counts, coord_type, lattice(3x3), coords(Nx3))"""
+    with open(poscar_path, "r") as f:
+        lines = [l.rstrip() for l in f if l.strip() != "" or True]
+
+    if len(lines) < 8:
+        raise ValueError(f"POSCAR太短: {poscar_path}")
+
+    scale = float(lines[1].split()[0])
+
+    a = [float(x) for x in lines[2].split()]
+    b = [float(x) for x in lines[3].split()]
+    c = [float(x) for x in lines[4].split()]
+    lattice = [[e*scale for e in a],
+               [e*scale for e in b],
+               [e*scale for e in c]]
+
+    def _is_int_list(s):
+        try:
+            _ = [int(x) for x in s.split()]
+            return True
+        except Exception:
+            return False
+
+    if _is_int_list(lines[5]):     # 老格式
+        species = []
+        counts = [int(x) for x in lines[5].split()]
+        start_idx = 6
+    else:                          # VASP5
+        species = lines[5].split()
+        counts = [int(x) for x in lines[6].split()]
+        start_idx = 7
+
+    # Selective dynamics
+    coord_type_line = lines[start_idx].strip().lower()
+    if coord_type_line.startswith('s'):
+        start_idx += 1
+        coord_type_line = lines[start_idx].strip().lower()
+
+    coord_type = 'Direct' if coord_type_line.startswith('d') else 'Cartesian'
+    start_idx += 1
+    natoms = sum(counts)
+
+    coords = []
+    for i in range(natoms):
+        toks = lines[start_idx + i].split()
+        coords.append([float(toks[0]), float(toks[1]), float(toks[2])])
+
+    if not species:
+        species = [f"X{i+1}" for i in range(len(counts))]
+
+    expanded_symbols = []
+    for sym, n in zip(species, counts):
+        expanded_symbols.extend([sym]*n)
+
+    return expanded_symbols, counts, coord_type, lattice, coords
+
+def _format_lattice_block(lattice):
+    lines = ["LATTICE", "Angstrom"]
+    for vec in lattice:
+        lines.append("   " + "    ".join(f"{v:.16f}" for v in vec))
+    lines.append("")  # 至少留一空行
+    return "\n".join(lines)
+
+def _format_positions_block(symbols, coord_type, coords):
+    lines = ["ATOM_POSITIONS",
+             f"{len(symbols)}                               ! number of atoms for projectors",
+             "Direct" if coord_type.lower().startswith("d") else "Cartesian"]
+    for sym, (x, y, z) in zip(symbols, coords):
+        lines.append(f"{sym:<3} {x:.16f}    {y:.16f}    {z:.16f} ")
+    lines.append("")  # 结束空行
+    return "\n".join(lines)
+
+# ===== win 投影解析 & 格式化 =====
+
+def _parse_win_projections(win_path, expanded_symbols):
+    """返回 per_atom_projectors: List[Tuple[str, List[str]]]
+    每个元素是 (元素符号, 轨道列表)，长度与 expanded_symbols 一致。
+    没有投影的原子，轨道列表为空。
+    """
+
     if not os.path.isfile(win_path):
         raise FileNotFoundError(f"未找到 {win_path}")
 
@@ -136,87 +236,181 @@ def _parse_win_projections(win_path):
     block = m.group(1)
     lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
 
+    # 轨道基序
     p_orbs = ["px", "py", "pz"]
     d_orbs = ["dz2", "dxz", "dyz", "dx2-y2", "dxy"]
+    base_order = ["s"] + p_orbs + d_orbs
 
-    per_atom_orbitals = []
+    # 映射：原子编号 -> 投影轨道
+    idx2orbs = {}
+    re_idx = re.compile(r"!\s*(\d+)")  # 提取编号
+
     for ln in lines:
-        ls = re.findall(r"l\s*=\s*([0-2])", ln)
+        ls = re.findall(r"\bl\s*=\s*([0-2])", ln)
         chosen = []
         if "0" in ls: chosen += ["s"]
         if "1" in ls: chosen += p_orbs
         if "2" in ls: chosen += d_orbs
-        if not chosen:
+        if not ls:
             chosen = ["s"]
-        per_atom_orbitals.append(chosen)
-    return per_atom_orbitals
 
-# ------- 从 POSCAR 展开原子符号 -------
-def _expand_symbols_from_poscar(poscar_path):
-    with open(poscar_path, "r") as f:
-        lines = [l.strip() for l in f if l.strip() or True]
-    def _is_int_list(s):
-        try: [int(x) for x in s.split()]; return True
-        except: return False
-    if _is_int_list(lines[5]):
-        species, counts = [], [int(x) for x in lines[5].split()]
-    else:
-        species, counts = lines[5].split(), [int(x) for x in lines[6].split()]
-    expanded = []
-    for sym, n in zip(species or [f"X{i+1}" for i in range(len(counts))], counts):
-        expanded.extend([sym]*n)
-    return expanded
+        mi = re_idx.search(ln)
+        if not mi:
+            continue
+        idx = int(mi.group(1))  # 1-based
+        prev = idx2orbs.get(idx, [])
+        merged_set = {o: None for o in prev}
+        for o in chosen:
+            merged_set.setdefault(o, None)
+        merged = [o for o in base_order if o in merged_set]
+        idx2orbs[idx] = merged
 
-# ------- 格式化 PROJECTORS 区块 -------
+    # 对齐 POSCAR
+    per_atom_projectors = []
+    for i, sym in enumerate(expanded_symbols, start=1):
+        orbs = idx2orbs.get(i, [])
+        per_atom_projectors.append((sym, orbs))
+
+    return per_atom_projectors
+
 def _format_projectors_block(expanded_symbols, per_atom_orbitals):
-    n = min(len(expanded_symbols), len(per_atom_orbitals))
-    counts = []
-    for orbs in per_atom_orbitals[:n]:
-        c = 0
-        if "s" in orbs: c += 1
-        if any(o in orbs for o in ("px","py","pz")): c += 3
-        if any(o in orbs for o in ("dz2","dxz","dyz","dx2-y2","dxy")): c += 5
-        counts.append(c)
-    head = " ".join(str(x) for x in counts)
+    """
+    生成 PROJECTORS 块（健壮版）：
+      * per_atom_orbitals 里允许出现嵌套列表/集合、大小写混用、组名 'p'/'d'
+      * 输出长度与 expanded_symbols 一致；per_atom_orbitals 短则补 []，长则截断
+      * 计数按组：s=1；p=3；d=5（出现任一成员就计满）
+      * 行内顺序：元素 + [s] + [px py pz] + [dz2 dxz dyz dx2-y2 dxy]
+    """
+    # 固定分组/顺序
+    p_orbs = ("px", "py", "pz")
+    d_orbs = ("dz2", "dxz", "dyz", "dx2-y2", "dxy")
+    valid = {"s", *p_orbs, *d_orbs}
 
+    def _flatten_orbs(orbs):
+        "把任意嵌套列表/集合拍平为字符串列表，并做 strip/lower"
+        flat = []
+        stack = []
+        if orbs is None:
+            return flat
+        if isinstance(orbs, (list, tuple, set)):
+            stack = list(orbs)
+        else:
+            stack = [orbs]
+        while stack:
+            x = stack.pop()
+            if isinstance(x, (list, tuple, set)):
+                stack.extend(x)
+            elif isinstance(x, str):
+                t = x.strip()
+                if t:
+                    flat.append(t)
+            # 其他类型（None、数字等）直接忽略
+        return [s.lower() for s in flat]
+
+    def _normalize_orbset(orbs):
+        "拍平 + 识别组名 'p'/'d' 并展开成具体轨道；只保留合法名"
+        tokens = _flatten_orbs(orbs)
+
+        # 允许 'p' 和 'd' 作为组名
+        has_p_group = any(tok == "p" for tok in tokens)
+        has_d_group = any(tok == "d" for tok in tokens)
+
+        orbset = set()
+        for tok in tokens:
+            if tok in valid:
+                orbset.add(tok)
+        if has_p_group:
+            orbset.update(p_orbs)
+        if has_d_group:
+            orbset.update(d_orbs)
+        return orbset
+
+    # 对齐长度
+    n_atoms = len(expanded_symbols)
+    if len(per_atom_orbitals) < n_atoms:
+        per_atom_orbitals = per_atom_orbitals + ([[]] * (n_atoms - len(per_atom_orbitals)))
+    elif len(per_atom_orbitals) > n_atoms:
+        per_atom_orbitals = per_atom_orbitals[:n_atoms]
+
+    # 统计 counts
+    counts = []
+    norm_orbsets = []
+    for orbs in per_atom_orbitals:
+        orbset = _normalize_orbset(orbs)
+        norm_orbsets.append(orbset)
+        s_has = "s" in orbset
+        p_has = any(o in orbset for o in p_orbs)
+        d_has = any(o in orbset for o in d_orbs)
+        c = (1 if s_has else 0) + (3 if p_has else 0) + (5 if d_has else 0)
+        counts.append(c)
+
+    # 输出
+    head = " ".join(str(x) for x in counts)
     lines = ["PROJECTORS", f" {head}                  ! number of projectors"]
-    for sym, orbs in zip(expanded_symbols[:n], per_atom_orbitals[:n]):
+
+    for sym, orbset in zip(expanded_symbols, norm_orbsets):
         row = [sym]
-        if "s" in orbs: row.append("s")
-        if any(o in orbs for o in ("px","py","pz")): row += ["px","py","pz"]
-        if any(o in orbs for o in ("dz2","dxz","dyz","dx2-y2","dxy")): row += ["dz2","dxz","dyz","dx2-y2","dxy"]
+        if "s" in orbset:
+            row.append("s")
+        if any(o in orbset for o in p_orbs):
+            row.extend(p_orbs)
+        if any(o in orbset for o in d_orbs):
+            row.extend(d_orbs)
         lines.append(" " + " ".join(row))
-    lines.append("")
+
+    lines.append("")  # 末尾空行
     return "\n".join(lines)
 
-# ------- 修改 Hrfile/E_FERMI -------
-def _replace_key_value_lines(text, hr_filename, efermi):
-    text = re.sub(r"(?m)^\s*Hrfile\s*=\s*'.*?'\s*$", f"Hrfile = '{hr_filename}'", text)
-    def _repl_ef(m):
-        parts = m.group(0).split("!")
-        new = f"E_FERMI = {efermi:.6f}"
-        if len(parts) > 1:
-            new += "    !" + "!".join(parts[1:])
-        return new
-    text = re.sub(r"(?m)^\s*E_FERMI\s*=\s*.*$", _repl_ef, text)
-    return text
+# ===== 总入口（一次性完成所有操作） =====
 
-# ------- 主函数 -------
 def write_wt_in_from_poscar(material_dir, template_wt_in, out_root):
-
+    """
+    - 若 out_root/<材料名> 目录不存在：返回 False, "<mat> 没有 hr"
+    - 否则：
+        * 复制模板 wt.in 到该目录
+        * 写入/替换 LATTICE, ATOM_POSITIONS, PROJECTORS
+        * 从 vasprun 读取 E_FERMI；同时替换 Hrfile='<mat>_hr.dat'
+    返回: (ok, 输出文件路径 | 错误信息)
+    """
     mat = os.path.basename(material_dir.rstrip(os.sep))
     target_dir = os.path.join(out_root, mat)
 
+    # 你要求：目录不存在则直接返回，不创建
     if not os.path.exists(target_dir):
         return False, f"{mat} 没有 hr"
 
     wt_out = os.path.join(target_dir, "wt.in")
     shutil.copy2(template_wt_in, wt_out)
 
+    # 读取模板
     with open(wt_out, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
 
-    # 读取 efermi
+    # 读取 POSCAR/CONTCAR → LATTICE & ATOM_POSITIONS
+    poscar_path = None
+    for name in ("POSCAR", "CONTCAR"):
+        p = os.path.join(material_dir, name)
+        if os.path.isfile(p):
+            poscar_path = p
+            break
+    if poscar_path is None:
+        return False, f"未找到 POSCAR/CONTCAR 于 {material_dir}"
+
+    try:
+        symbols, counts, coord_type, lattice, coords = _parse_poscar(poscar_path)
+    except Exception as e:
+        return False, f"解析POSCAR失败: {e}"
+
+    lattice_block = _format_lattice_block(lattice)
+    positions_block = _format_positions_block(symbols, coord_type, coords)
+    content = _replace_section(content, "LATTICE", lattice_block)
+    content = _replace_section(content, "ATOM_POSITIONS", positions_block)
+
+    # 从 vasprun 读取费米能
+    vasprun_path = None
+    for fn in ("vasprun.xml", "vasprun.xml.gz"):
+        p = os.path.join(material_dir, p := os.path.join(material_dir, fn))
+        # 修正写法
     vasprun_path = None
     for fn in ("vasprun.xml", "vasprun.xml.gz"):
         p = os.path.join(material_dir, fn)
@@ -224,23 +418,22 @@ def write_wt_in_from_poscar(material_dir, template_wt_in, out_root):
             vasprun_path = p
             break
     if vasprun_path is None:
-        raise FileNotFoundError("未找到 vasprun.xml 或 vasprun.xml.gz")
+        return False, "未找到 vasprun.xml 或 vasprun.xml.gz"
     vr = Vasprun(vasprun_path, parse_projected_eigen=False)
     efermi = vr.efermi
 
-    # 替换 Hrfile/E_FERMI
+    # Hrfile / E_FERMI
     content = _replace_key_value_lines(content, f"{mat}_hr.dat", efermi)
 
-    # 生成 PROJECTORS
+    # PROJECTORS：从 wannier90.win 解析
     win_path = os.path.join(material_dir, "WR", "wannier90.win")
-    per_atom_orbitals = _parse_win_projections(win_path)
-    poscar_path = os.path.join(material_dir, "POSCAR")
-    if not os.path.isfile(poscar_path):
-        poscar_path = os.path.join(material_dir, "CONTCAR")
-    expanded_symbols = _expand_symbols_from_poscar(poscar_path)
+    per_atom_orbitals = _parse_win_projections(win_path, symbols)
+    # 用 POSCAR 展开的元素名对齐
+    expanded_symbols = symbols  # 已经是展开后的
     proj_block = _format_projectors_block(expanded_symbols, per_atom_orbitals)
     content = _replace_section(content, "PROJECTORS", proj_block)
 
+    # 关键块间加空行
     content = _ensure_extra_blank_line_between_blocks(content)
 
     with open(wt_out, "w", encoding="utf-8") as f:

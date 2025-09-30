@@ -384,7 +384,7 @@ subroutine readinput
       BerryPhase_calc.or.BerryCurvature_EF_calc.or.BerryCurvature_calc.or.&
       BerryCurvature_plane_selectedbands_calc.or.BerryCurvature_slab_calc.or.&
       MirrorChern_calc.or.WeylChirality_calc.or.NLChirality_calc.or.&
-      FindNodes_calc.or.FermiLevel_calc) then
+      FermiLevel_calc) then
          write(*, *)"ERROR: you should set Numoccupied in namelist SYSTEM correctly!!!"
          stop
       else 
