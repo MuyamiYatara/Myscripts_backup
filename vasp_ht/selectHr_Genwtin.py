@@ -217,8 +217,12 @@ def _format_positions_block(symbols, coord_type, coords):
 
 # ===== win 投影解析 & 格式化 =====
 
-def _parse_win_projections(win_path):
-    """返回 per_atom_orbitals: List[List[str]]，顺序: s | px py pz | dz2 dxz dyz dx2-y2 dxy"""
+def _parse_win_projections(win_path, expanded_symbols):
+    """返回 per_atom_projectors: List[Tuple[str, List[str]]]
+    每个元素是 (元素符号, 轨道列表)，长度与 expanded_symbols 一致。
+    没有投影的原子，轨道列表为空。
+    """
+
     if not os.path.isfile(win_path):
         raise FileNotFoundError(f"未找到 {win_path}")
 
@@ -232,41 +236,129 @@ def _parse_win_projections(win_path):
     block = m.group(1)
     lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
 
+    # 轨道基序
     p_orbs = ["px", "py", "pz"]
     d_orbs = ["dz2", "dxz", "dyz", "dx2-y2", "dxy"]
+    base_order = ["s"] + p_orbs + d_orbs
 
-    per_atom_orbitals = []
+    # 映射：原子编号 -> 投影轨道
+    idx2orbs = {}
+    re_idx = re.compile(r"!\s*(\d+)")  # 提取编号
+
     for ln in lines:
-        ls = re.findall(r"l\s*=\s*([0-2])", ln)
+        ls = re.findall(r"\bl\s*=\s*([0-2])", ln)
         chosen = []
         if "0" in ls: chosen += ["s"]
         if "1" in ls: chosen += p_orbs
         if "2" in ls: chosen += d_orbs
-        if not chosen:
+        if not ls:
             chosen = ["s"]
-        per_atom_orbitals.append(chosen)
-    return per_atom_orbitals
+
+        mi = re_idx.search(ln)
+        if not mi:
+            continue
+        idx = int(mi.group(1))  # 1-based
+        prev = idx2orbs.get(idx, [])
+        merged_set = {o: None for o in prev}
+        for o in chosen:
+            merged_set.setdefault(o, None)
+        merged = [o for o in base_order if o in merged_set]
+        idx2orbs[idx] = merged
+
+    # 对齐 POSCAR
+    per_atom_projectors = []
+    for i, sym in enumerate(expanded_symbols, start=1):
+        orbs = idx2orbs.get(i, [])
+        per_atom_projectors.append((sym, orbs))
+
+    return per_atom_projectors
 
 def _format_projectors_block(expanded_symbols, per_atom_orbitals):
-    n = min(len(expanded_symbols), len(per_atom_orbitals))
+    """
+    生成 PROJECTORS 块（健壮版）：
+      * per_atom_orbitals 里允许出现嵌套列表/集合、大小写混用、组名 'p'/'d'
+      * 输出长度与 expanded_symbols 一致；per_atom_orbitals 短则补 []，长则截断
+      * 计数按组：s=1；p=3；d=5（出现任一成员就计满）
+      * 行内顺序：元素 + [s] + [px py pz] + [dz2 dxz dyz dx2-y2 dxy]
+    """
+    # 固定分组/顺序
+    p_orbs = ("px", "py", "pz")
+    d_orbs = ("dz2", "dxz", "dyz", "dx2-y2", "dxy")
+    valid = {"s", *p_orbs, *d_orbs}
 
+    def _flatten_orbs(orbs):
+        "把任意嵌套列表/集合拍平为字符串列表，并做 strip/lower"
+        flat = []
+        stack = []
+        if orbs is None:
+            return flat
+        if isinstance(orbs, (list, tuple, set)):
+            stack = list(orbs)
+        else:
+            stack = [orbs]
+        while stack:
+            x = stack.pop()
+            if isinstance(x, (list, tuple, set)):
+                stack.extend(x)
+            elif isinstance(x, str):
+                t = x.strip()
+                if t:
+                    flat.append(t)
+            # 其他类型（None、数字等）直接忽略
+        return [s.lower() for s in flat]
+
+    def _normalize_orbset(orbs):
+        "拍平 + 识别组名 'p'/'d' 并展开成具体轨道；只保留合法名"
+        tokens = _flatten_orbs(orbs)
+
+        # 允许 'p' 和 'd' 作为组名
+        has_p_group = any(tok == "p" for tok in tokens)
+        has_d_group = any(tok == "d" for tok in tokens)
+
+        orbset = set()
+        for tok in tokens:
+            if tok in valid:
+                orbset.add(tok)
+        if has_p_group:
+            orbset.update(p_orbs)
+        if has_d_group:
+            orbset.update(d_orbs)
+        return orbset
+
+    # 对齐长度
+    n_atoms = len(expanded_symbols)
+    if len(per_atom_orbitals) < n_atoms:
+        per_atom_orbitals = per_atom_orbitals + ([[]] * (n_atoms - len(per_atom_orbitals)))
+    elif len(per_atom_orbitals) > n_atoms:
+        per_atom_orbitals = per_atom_orbitals[:n_atoms]
+
+    # 统计 counts
     counts = []
-    for orbs in per_atom_orbitals[:n]:
-        c = 0
-        if "s" in orbs: c += 1
-        if any(o in orbs for o in ("px","py","pz")): c += 3
-        if any(o in orbs for o in ("dz2","dxz","dyz","dx2-y2","dxy")): c += 5
+    norm_orbsets = []
+    for orbs in per_atom_orbitals:
+        orbset = _normalize_orbset(orbs)
+        norm_orbsets.append(orbset)
+        s_has = "s" in orbset
+        p_has = any(o in orbset for o in p_orbs)
+        d_has = any(o in orbset for o in d_orbs)
+        c = (1 if s_has else 0) + (3 if p_has else 0) + (5 if d_has else 0)
         counts.append(c)
-    head = " ".join(str(x) for x in counts)
 
+    # 输出
+    head = " ".join(str(x) for x in counts)
     lines = ["PROJECTORS", f" {head}                  ! number of projectors"]
-    for sym, orbs in zip(expanded_symbols[:n], per_atom_orbitals[:n]):
+
+    for sym, orbset in zip(expanded_symbols, norm_orbsets):
         row = [sym]
-        if "s" in orbs: row.append("s")
-        if any(o in orbs for o in ("px","py","pz")): row += ["px","py","pz"]
-        if any(o in orbs for o in ("dz2","dxz","dyz","dx2-y2","dxy")): row += ["dz2","dxz","dyz","dx2-y2","dxy"]
+        if "s" in orbset:
+            row.append("s")
+        if any(o in orbset for o in p_orbs):
+            row.extend(p_orbs)
+        if any(o in orbset for o in d_orbs):
+            row.extend(d_orbs)
         lines.append(" " + " ".join(row))
-    lines.append("")
+
+    lines.append("")  # 末尾空行
     return "\n".join(lines)
 
 # ===== 总入口（一次性完成所有操作） =====
@@ -335,7 +427,7 @@ def write_wt_in_from_poscar(material_dir, template_wt_in, out_root):
 
     # PROJECTORS：从 wannier90.win 解析
     win_path = os.path.join(material_dir, "WR", "wannier90.win")
-    per_atom_orbitals = _parse_win_projections(win_path)
+    per_atom_orbitals = _parse_win_projections(win_path, symbols)
     # 用 POSCAR 展开的元素名对齐
     expanded_symbols = symbols  # 已经是展开后的
     proj_block = _format_projectors_block(expanded_symbols, per_atom_orbitals)
