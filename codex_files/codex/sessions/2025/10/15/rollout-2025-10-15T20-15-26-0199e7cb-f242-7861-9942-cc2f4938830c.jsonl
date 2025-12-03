@@ -1,0 +1,6 @@
+{"timestamp":"2025-10-15T12:15:26.797Z","type":"session_meta","payload":{"id":"0199e7cb-f242-7861-9942-cc2f4938830c","timestamp":"2025-10-15T12:15:26.787Z","cwd":"/data/home/ycshen","originator":"codex_cli_rs","cli_version":"0.46.0","instructions":null,"source":"cli"}}
+{"timestamp":"2025-10-15T12:15:26.922Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n  <cwd>/data/home/ycshen</cwd>\n  <approval_policy>on-request</approval_policy>\n  <sandbox_mode>read-only</sandbox_mode>\n  <network_access>restricted</network_access>\n</environment_context>"}]}}
+{"timestamp":"2025-10-15T12:15:35.002Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}}
+{"timestamp":"2025-10-15T12:15:35.004Z","type":"event_msg","payload":{"type":"user_message","message":"hi","kind":"plain"}}
+{"timestamp":"2025-10-15T12:15:35.005Z","type":"turn_context","payload":{"cwd":"/data/home/ycshen","approval_policy":"on-request","sandbox_policy":{"mode":"read-only"},"model":"gpt-5-codex","effort":"high","summary":"auto"}}
+{"timestamp":"2025-10-15T12:17:14.573Z","type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupted"}}

@@ -1,0 +1,10 @@
+[2m2025-10-15T11:38:49.662515Z[0m [31mERROR[0m Failed to read auth.json: No such file or directory (os error 2)
+[2m2025-10-15T11:38:52.360925Z[0m [31mERROR[0m Failed to update version: HTTP status client error (403 rate limit exceeded) for url (https://api.github.com/repos/openai/codex/releases/latest)
+[2m2025-10-15T11:57:36.656177Z[0m [32m INFO[0m ERR: No such file or directory (os error 2)
+[2m2025-10-15T11:57:50.531927Z[0m [32m INFO[0m Selected model: gpt-5-codex, Selected effort: high
+[2m2025-10-15T11:59:03.273896Z[0m [32m INFO[0m ERR: No such file or directory (os error 2)
+[2m2025-10-15T11:59:03.273922Z[0m [32m INFO[0m ERR: No such file or directory (os error 2)
+[2m2025-10-15T11:59:27.442555Z[0m [32m INFO[0m Shutting down Codex instance
+[2m2025-10-15T12:17:14.569953Z[0m [32m INFO[0m interrupt received: abort current task, if any
+[2m2025-10-15T12:17:16.236969Z[0m [32m INFO[0m Shutting down Codex instance
+[2m2025-10-15T12:19:32.766512Z[0m [32m INFO[0m Shutting down Codex instance
