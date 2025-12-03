@@ -156,6 +156,38 @@ def get_fermi_energy():
                 return float(fermi_energy)  # 转换为浮点数并返回
     return None  # 如果没有找到匹配项
 
+def get_BD_FERMI_ENERGY(path="./BD/FERMI_ENERGY"):
+    """
+    从 ./BD/FERMI_ENERGY 文件中读取费米能，返回 float。
+    假设文件格式为：
+    第1行：注释
+    第2行：数值 + 注释，例如
+        8.153508        # e.g., Set the value of VBM ...
+    """
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"FERMI_ENERGY 文件不存在: {path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    if len(lines) < 2:
+        raise ValueError("FERMI_ENERGY 文件格式不正确：行数不足 2 行。")
+
+    # 第二行内容，去掉注释，只保留数值部分
+    line = lines[1].strip()
+    # 按 '#' 分割，取左边的数值部分
+    num_str = line.split('#', 1)[0].strip()
+
+    if not num_str:
+        raise ValueError("第二行中没有检测到数值内容。")
+
+    try:
+        fermi = float(num_str)
+    except ValueError as e:
+        raise ValueError(f"无法将 '{num_str}' 转换为浮点数：{e}")
+
+    return fermi
+
 def get_num_wann(win_file="wannier90.win"):
     num_wann = None
     with open(win_file, "r") as f:
@@ -406,7 +438,7 @@ nano = sp.Popen(["cp", f"/data/home/ycshen/Myscripts/dft-tools/{sbatch_script_na
 vaspkit = sp.Popen(["vaspkit"], stdin=sp.PIPE)
 
 # vaspkit task 102, Monkhorst-Pack Scheme
-command_sc_inputs = f"102\n1\n{kmesh_accurary_level}\n".encode()
+command_sc_inputs = f"102\n2\n{kmesh_accurary_level}\n".encode()
 
 # copy the sbatch script and generate the basic input files
 nano.communicate()
@@ -497,7 +529,7 @@ vaspkit.communicate(command_bd_inputs)
 sp.run(['cp', 'KPATH.in', 'KPOINTS'])
 
 # modify the number of kpoints 
-knum = '    70'
+knum = '    50'
 with open('KPOINTS', 'r') as f:
     lines = f.readlines()
 if len(lines) >= 2:
@@ -726,7 +758,7 @@ if (wrscf == 1) :
 
 if (wr == 1) :
 
-    efermi = get_fermi_energy()
+    efermi_BD = get_BD_FERMI_ENERGY()
     os.chdir('./WR')
     sbatch_script_name = 'W90.sh'
     sbatch_para = {
@@ -788,7 +820,7 @@ if (wr == 1) :
 
         input_file = 'wannier90_band.gnu'
         output_file = 'w9_nsoc.gnu'
-        modify_and_copy_file(input_file, output_file, efermi)
+        modify_and_copy_file(input_file, output_file, efermi_BD)
         sp.run(["gnuplot", "w9_nsoc.gnu"])
 
     elif os.path.exists("wannier90.amn") and os.path.exists("wannier90.mmn") and os.path.exists("wannier90.eig"):
@@ -797,7 +829,7 @@ if (wr == 1) :
 
         input_file = 'wannier90_band.gnu'
         output_file = 'w9.gnu'
-        modify_and_copy_file(input_file, output_file, efermi)
+        modify_and_copy_file(input_file, output_file, efermi_BD)
         sp.run(["gnuplot", "w9.gnu"])
 
         
