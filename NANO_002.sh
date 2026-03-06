@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-#SBATCH -N 1
-#SBATCH -n 64
+#SBATCH -n 64                 # 64个MPI进程（原来128减半）
+#SBATCH --cpus-per-task=2     # 每个MPI进程占2个CPU核
 #SBATCH -A hmt03  
-#SBATCH -p regular,regular6430
-#SBATCH --job-name=NaN
+#SBATCH -p regular256
+#SBATCH --job-name=Bi_NE
 #SBATCH --output=./log 
 #SBATCH --error=./err
 #
@@ -32,9 +32,7 @@ echo ”A total of $SLURM_NTASKS tasks is used”
 ### 加载任务所需要的库  /home/ycshen/wannier_tools_test/bin/wt.x 
 #export LD_LIBRARY_PATH=/usr/local/lib64:$LD_LIBRARY_PATH
 #
-mpirun /data/home/apps/vasp5.4.4/vasp5.4.4_wannier90-1.2/bin/vasp_ncl
-
-
+mpirun /data/home/ycshen/Thermoelectric_wanniertools/bin/wt.x
 
 
   
